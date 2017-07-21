@@ -111,7 +111,7 @@ git clone https://github.com/msracver/Deformable-ConvNets.git
 	```
 	git clone --recursive https://github.com/dmlc/mxnet.git
 	git checkout 62ecb60
-	git submodule update
+	git submodule update --remote --merge
 	```
 	3.2 Copy operators in `$(DCN_ROOT)/rfcn/operator_cxx` or `$(DCN_ROOT)/faster_rcnn/operator_cxx` to `$(YOUR_MXNET_FOLDER)/src/operator/contrib` by
 	```
@@ -120,7 +120,7 @@ git clone https://github.com/msracver/Deformable-ConvNets.git
 	3.3 Compile MXNet
 	```
 	cd ${MXNET_ROOT}
-	make -j4
+	make -j16 USE_OPENCV=1 USE_BLAS=openblas USE_CUDA=1 USE_CUDA_PATH=/usr/local/cuda USE_CUDNN=1
 	```
 	3.4 Install the MXNet Python binding by
 	
