@@ -1,100 +1,164 @@
 # Deformable Convolutional Networks
-
-
-The major contributors of this repository include [Yuwen Xiong](https://github.com/Orpine), [Haozhi Qi](https://github.com/Oh233), [Guodong Zhang](https://github.com/gd-zhang), [Yi Li](https://github.com/liyi14), [Jifeng Dai](https://github.com/daijifeng001), [Bin Xiao](https://github.com/leoxiaobin), [Han Hu](https://github.com/ancientmooner) and  [Yichen Wei](https://github.com/YichenWei).
-
-**[A third-party improvement](https://github.com/bharatsingh430/Deformable-ConvNets) of Deformable R-FCN + Soft NMS, best single-model performance on COCO detection**
-
-
-## Introduction
-
-**Deformable ConvNets** is initially described in an [arxiv tech report](https://arxiv.org/abs/1703.06211).
-
-**R-FCN** is initially described in a [NIPS 2016 paper](https://arxiv.org/abs/1605.06409).
-
-
-<img src='demo/deformable_conv_demo1.png' width='800'>
-<img src='demo/deformable_conv_demo2.png' width='800'>
-<img src='demo/deformable_psroipooling_demo.png' width='800'>
-
-## Disclaimer
-
-This is an official implementation for [Deformable Convolutional Networks](https://arxiv.org/abs/1703.06211) (Deformable ConvNets) based on MXNet. It is worth noticing that:
-
-  * The original implementation is based on our internal Caffe version on Windows. There are slight differences in the final accuracy and running time due to the plenty details in platform switch.
-  * The code is tested on official [MXNet@(commit 62ecb60)](https://github.com/dmlc/mxnet/tree/62ecb60) with the extra operators for Deformable ConvNets.
-  	* After [MXNet@(commit ce2bca6)](https://github.com/dmlc/mxnet/tree/ce2bca6) the offical MXNet support all operators for Deformable ConvNets.
-  * We trained our model based on the ImageNet pre-trained [ResNet-v1-101](https://github.com/KaimingHe/deep-residual-networks) using a [model converter](https://github.com/dmlc/mxnet/tree/430ea7bfbbda67d993996d81c7fd44d3a20ef846/tools/caffe_converter). The converted model produces slightly lower accuracy (Top-1 Error on ImageNet val: 24.0% v.s. 23.6%).
-  * This repository used code from [MXNet rcnn example](https://github.com/dmlc/mxnet/tree/master/example/rcnn) and [mx-rfcn](https://github.com/giorking/mx-rfcn).
-  
-## License
-
-© Microsoft, 2017. Licensed under an Apache-2.0 license.
-
-## Citing Deformable ConvNets
-
-If you find Deformable ConvNets useful in your research, please consider citing:
+## Requirements: software
 ```
-@article{dai17dcn,
-    Author = {Jifeng Dai, Haozhi Qi, Yuwen Xiong, Yi Li, Guodong Zhang, Han Hu, Yichen Wei},
-    Title = {Deformable Convolutional Networks},
-    Journal = {arXiv preprint arXiv:1703.06211},
-    Year = {2017}
-}
-@inproceedings{dai16rfcn,
-    Author = {Jifeng Dai, Yi Li, Kaiming He, Jian Sun},
-    Title = {{R-FCN}: Object Detection via Region-based Fully Convolutional Networks},
-    Conference = {NIPS},
-    Year = {2016}
-}
+pip install Cython
+pip install opencv-python==3.2.0.6
+pip install easydict==1.6
+
+g++ version > 4.9
+install g++ 4.9.2
+
+sudo yum install libmpc-devel mpfr-devel gmp-devel
+cd ~/Downloads
+curl ftp://ftp.mirrorservice.org/sites/sourceware.org/pub/gcc/releases/gcc-4.9.2/gcc-4.9.2.tar.bz2 -O
+tar xvfj gcc-4.9.2.tar.bz2
+
+cd gcc-4.9.2
+./configure --disable-multilib --enable-languages=c,c++
+make -j32
+make install
+
+check: g++ -v
+
+```
+if you are update g++4.9.2 from old version,you must check your  dynamic library:
+
+strings /usr/lib/libstdc++.so.6 | grep CXXABI
+
+the results like:
+```
+CXXABI_1.3
+CXXABI_1.3.1
+CXXABI_1.3.2
+CXXABI_1.3.3
+```
+lacking CXXABI_1.3.8, this is because we donot update the  dynamic library
+
+step1:
+
+```
+find / -name "libstdc++.so.*"
+```
+you will find 
+```
+/usr/local/src/gcc-6.3.0/gcc-build-6.3.0/prev-i686-pc-linux-gnu/libstdc++-v3/src/.libs/libstdc++.so.6.0.22
+/usr/local/src/gcc-6.3.0/gcc-build-6.3.0/prev-i686-pc-linux-gnu/libstdc++-v3/src/.libs/libstdc++.so.6
+/usr/local/src/gcc-6.3.0/gcc-build-6.3.0/stage1-i686-pc-linux-gnu/libstdc++-v3/src/.libs/libstdc++.so.6.0.22
+/usr/local/src/gcc-6.3.0/gcc-build-6.3.0/stage1-i686-pc-linux-gnu/libstdc++-v3/src/.libs/libstdc++.so.6
+/usr/local/src/gcc-6.3.0/gcc-build-6.3.0/i686-pc-linux-gnu/libstdc++-v3/src/.libs/libstdc++.so.6.0.22
+/usr/local/src/gcc-6.3.0/gcc-build-6.3.0/i686-pc-linux-gnu/libstdc++-v3/src/.libs/libstdc++.so.6
+/usr/local/lib/libstdc++.so.6.0.22
+/usr/local/lib/libstdc++.so.6.0.22-gdb.py
+/usr/local/lib/libstdc++.so.6
+/usr/lib/libstdc++.so.6.0.13
+/usr/lib/libstdc++.so.6
+……
+```
+note that: the path /usr/local/src/gcc-6.3.0/gcc-build-6.3.0/i686-pc-linux-gnu replace by your path
+
+step 2:
+```
+cp /usr/local/src/gcc-6.3.0/gcc-build-6.3.0/i686-pc-linux-gnu/libstdc++-v3/src/.libs/libstdc++.so.6.0.22 /usr/lib/
+```
+step 3:
+```
+cd /usr/lib
+rm -rf libstdc++.so.6
+ln -s libstdc++.so.6.0.22 libstdc++.so.6
 ```
 
-## Main Results
+```
+strings /usr/lib/libstdc++.so.6 | grep 'CXXABI'
 
-|                                 | training data     | testing data | mAP@0.5 | mAP@0.7 | time   |
-|---------------------------------|-------------------|--------------|---------|---------|--------|
-| R-FCN, ResNet-v1-101            | VOC 07+12 trainval| VOC 07 test  | 79.6    | 63.1    | 0.16s |
-| Deformable R-FCN, ResNet-v1-101 | VOC 07+12 trainval| VOC 07 test  | 82.3    | 67.8    | 0.19s |
+CXXABI_1.3
+CXXABI_1.3.1
+CXXABI_1.3.2
+CXXABI_1.3.3
+CXXABI_1.3.4
+CXXABI_1.3.5
+CXXABI_1.3.6
+CXXABI_1.3.7
+CXXABI_1.3.8
+CXXABI_1.3.9
+CXXABI_1.3.10
+CXXABI_TM_1
+CXXABI_FLOAT128
+```
+if you are runing in x64
+```
+strings /usr/lib64/libstdc++.so.6 | grep GLIBC
+the results:
+GLIBCXX_3.4
+GLIBCXX_3.4.1
+GLIBCXX_3.4.2
+GLIBCXX_3.4.3
+GLIBCXX_3.4.4
+GLIBCXX_3.4.5
+GLIBCXX_3.4.6
+GLIBCXX_3.4.7
+GLIBCXX_3.4.8
+GLIBCXX_3.4.9
+GLIBCXX_3.4.10
+GLIBCXX_3.4.11
+GLIBCXX_3.4.12
+GLIBCXX_3.4.13
+GLIBCXX_FORCE_NEW
+GLIBCXX_DEBUG_MESSAGE_LENGTH
+```
+
+```
+find / -name "libstdc++.so*"
+
+/home/gcc-5.2.0/gcc-temp/stage1-x86_64-unknown-linux-gnu/libstdc++-v3/src/.libs/libstdc++.so
+/home/gcc-5.2.0/gcc-temp/stage1-x86_64-unknown-linux-gnu/libstdc++-v3/src/.libs/libstdc++.so.6
+/home/gcc-5.2.0/gcc-temp/stage1-x86_64-unknown-linux-gnu/libstdc++-v3/src/.libs/libstdc++.so.6.0.21  //the new
+……
 
 
 
-|                                 | <sub>training data</sub> | <sub>testing data</sub>  | <sub>mAP</sub>  | <sub>mAP@0.5</sub> | <sub>mAP@0.75</sub>| <sub>mAP@S</sub> | <sub>mAP@M</sub> | <sub>mAP@L</sub> |
-|---------------------------------|---------------|---------------|------|---------|---------|-------|-------|-------|
-| <sub>R-FCN, ResNet-v1-101 </sub>           | <sub>coco trainval</sub> | <sub>coco test-dev</sub> | 32.1 | 54.3    |   33.8  | 12.8  | 34.9  | 46.1  | 
-| <sub>Deformable R-FCN, ResNet-v1-101</sub> | <sub>coco trainval</sub> | <sub>coco test-dev</sub> | 35.7 | 56.8    | 38.3    | 15.2  | 38.8  | 51.5  |
-| <sub>Faster R-CNN (2fc), ResNet-v1-101 </sub>           | <sub>coco trainval</sub> | <sub>coco test-dev</sub> | 30.3 | 52.1    |   31.4  | 9.9  | 32.2  | 47.4  | 
-| <sub>Deformable Faster R-CNN (2fc), </br>ResNet-v1-101</sub> | <sub>coco trainval</sub> | <sub>coco test-dev</sub> | 35.0 | 55.0    | 38.3    | 14.3  | 37.7  | 52.0  |
+cp /home/gcc-5.2.0/gcc-temp/stage1-x86_64-unknown-linux-gnu/libstdc++-v3/src/.libs/libstdc++.so.6.0.21 /usr/lib64
+
+
+cd /usr/lib64
+rm -rf libstdc++.so.6
+ln -s libstdc++.so.6.0.21 libstdc++.so.6
+strings /usr/lib64/libstdc++.so.6 | grep GLIBC
+
+the results:
+
+GLIBCXX_3.4
+GLIBCXX_3.4.1
+GLIBCXX_3.4.2
+GLIBCXX_3.4.3
+GLIBCXX_3.4.4
+GLIBCXX_3.4.5
+GLIBCXX_3.4.6
+GLIBCXX_3.4.7
+GLIBCXX_3.4.8
+GLIBCXX_3.4.9
+GLIBCXX_3.4.10
+GLIBCXX_3.4.11
+GLIBCXX_3.4.12
+GLIBCXX_3.4.13
+GLIBCXX_3.4.14
+GLIBCXX_3.4.15
+GLIBCXX_3.4.16
+GLIBCXX_3.4.17
+GLIBCXX_3.4.18
+GLIBCXX_3.4.19
+GLIBCXX_3.4.20
+GLIBCXX_3.4.21
+GLIBC_2.3
+GLIBC_2.2.5
+GLIBC_2.3.2
+GLIBCXX_FORCE_NEW
+GLIBCXX_DEBUG_MESSAGE_LENGTH
+
+```
 
 
 
-|                                   | training data              | testing data   | mIoU | time  |
-|-----------------------------------|----------------------------|----------------|------|-------|
-| DeepLab, ResNet-v1-101            | Cityscapes train           | Cityscapes val | 70.3 | 0.51s |
-| Deformable DeepLab, ResNet-v1-101 | Cityscapes train           | Cityscapes val | 75.2 | 0.52s |
-| DeepLab, ResNet-v1-101            | VOC 12 train (augmented) | VOC 12 val   | 70.7 | 0.08s |
-| Deformable DeepLab, ResNet-v1-101 | VOC 12 train (augmented) | VOC 12 val   | 75.9 | 0.08s |
 
-
-*Running time is counted on a single Maxwell Titan X GPU (mini-batch size is 1 in inference).*
-
-## Requirements: Software
-
-1. MXNet from [the offical repository](https://github.com/dmlc/mxnet). We tested our code on [MXNet@(commit 62ecb60)](https://github.com/dmlc/mxnet/tree/62ecb60). Due to the rapid development of MXNet, it is recommended to checkout this version if you encounter any issues. We may maintain this repository periodically if MXNet adds important feature in future release.
-
-2. Python 2.7. We recommend using Anaconda2
-
-3. Python packages might missing: cython, opencv-python >= 3.2.0, easydict. If `pip` is set up on your system, those packages should be able to be fetched and installed by running
-	```
-	pip install Cython
-	pip install opencv-python==3.2.0.6
-	pip install easydict==1.6
-	```
-4. For Windows users, Visual Studio 2015 is needed to compile cython module.
-
-
-## Requirements: Hardware
-
-Any NVIDIA GPUs with at least 4GB memory should be OK.
 
 ## Installation
 
@@ -108,10 +172,9 @@ git clone https://github.com/msracver/Deformable-ConvNets.git
 3. Install MXNet:
 
 	3.1 Clone MXNet and checkout to [MXNet@(commit 62ecb60)](https://github.com/dmlc/mxnet/tree/62ecb60) by
+	
 	```
-	git clone --recursive https://github.com/dmlc/mxnet.git
-	git checkout 62ecb60
-	git submodule update --remote --merge
+	git clone  https://github.com/dmlc/mxnet.git --recursive && --checkout v0.9.5
 	```
 	3.2 Copy operators in `$(DCN_ROOT)/rfcn/operator_cxx` or `$(DCN_ROOT)/faster_rcnn/operator_cxx` to `$(YOUR_MXNET_FOLDER)/src/operator/contrib` by
 	```
